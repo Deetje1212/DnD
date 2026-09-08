@@ -14,7 +14,8 @@ const CharacterFactory = {
       stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
       hp: { current: 10, max: 10 },
       inventory: [],
-      skills: []
+      skills: [],
+      spells: []
     };
   },
 
@@ -42,7 +43,10 @@ const CharacterFactory = {
       inventory: Array.isArray(raw.inventory)
         ? raw.inventory.map(it => sanitizeItem(it)).filter(Boolean)
         : [],
-      skills: Array.isArray(raw.skills) ? raw.skills.map(s => String(s).slice(0, 40)).slice(0, 12) : []
+      skills: Array.isArray(raw.skills) ? raw.skills.map(s => String(s).slice(0, 40)).slice(0, 12) : [],
+      spells: Array.isArray(raw.spells)
+        ? raw.spells.map(sp => sanitizeItem(sp)).filter(Boolean)
+        : []
     };
   },
 
@@ -67,6 +71,13 @@ const CharacterFactory = {
         if (!next.skills.includes(skill)) next.skills.push(skill);
       });
     }
+    if (!Array.isArray(next.spells)) next.spells = [];
+    if (Array.isArray(update.newSpells)) {
+      update.newSpells.forEach(sp => {
+        const clean = sanitizeItem(sp);
+        if (clean && !next.spells.some(s => s.name === clean.name)) next.spells.push(clean);
+      });
+    }
     return next;
   },
 
@@ -81,6 +92,22 @@ const CharacterFactory = {
     const next = structuredClone(sheet);
     const idx = next.inventory.findIndex(i => i.name === itemName);
     if (idx >= 0) next.inventory.splice(idx, 1);
+    return next;
+  },
+
+  addSpell(sheet, spell) {
+    const next = structuredClone(sheet);
+    const clean = sanitizeItem(spell);
+    if (!Array.isArray(next.spells)) next.spells = [];
+    if (clean && !next.spells.some(s => s.name === clean.name)) next.spells.push(clean);
+    return next;
+  },
+
+  removeSpell(sheet, spellName) {
+    const next = structuredClone(sheet);
+    if (!Array.isArray(next.spells)) next.spells = [];
+    const idx = next.spells.findIndex(s => s.name === spellName);
+    if (idx >= 0) next.spells.splice(idx, 1);
     return next;
   },
 

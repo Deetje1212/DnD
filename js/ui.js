@@ -103,6 +103,15 @@ const UI = {
         <p class="text-xs text-parchment/50 mb-1">Vaardigheden</p>
         <p class="text-sm">${c.skills.map(escapeHtml).join(' · ')}</p>
       </div>` : ''}
+      ${(c.spells && c.spells.length) ? `
+      <div class="mb-4">
+        <p class="text-xs text-parchment/50 mb-1">Spreuken</p>
+        <div class="space-y-1">
+          ${c.spells.map(s => `
+            <div class="inv-item" title="${escapeHtml(s.description || '')}">${escapeHtml(s.name)}</div>
+          `).join('')}
+        </div>
+      </div>` : ''}
       <div class="mb-2 flex items-center justify-between">
         <p class="text-xs text-parchment/50">Inventaris</p>
         <button id="btn-open-inventory" class="text-xs text-gold hover:underline">bewerken</button>
