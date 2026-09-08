@@ -1,0 +1,120 @@
+/* ---- Design tokens ----
+   Base:      #12100D  (near-black, warm — like old varnish)
+   Panel:     #1B1712
+   Line:      #382F24
+   Parchment: #E9DFC8  (body text)
+   Gold:      #C79A4B  (accent — used sparingly, headings & primary actions)
+   Blood:     #7A2E2E  (danger / HP / decline)
+   Forest:    #3B5443  (accept / success)
+*/
+
+:root {
+  --ink: #12100D;
+  --panel: #1B1712;
+  --line: #382F24;
+  --parchment: #E9DFC8;
+  --gold: #C79A4B;
+  --blood: #7A2E2E;
+  --forest: #3B5443;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background:
+    radial-gradient(ellipse at top, rgba(199,154,75,0.06), transparent 60%),
+    var(--ink);
+}
+
+.font-display { font-family: 'Cormorant SC', serif; }
+.font-body { font-family: 'Spectral', Georgia, serif; }
+
+.bg-ink { background-color: var(--ink); }
+.bg-panel { background-color: var(--panel); }
+.border-line { border-color: var(--line); }
+.text-parchment { color: var(--parchment); }
+.text-gold { color: var(--gold); }
+
+.screen { animation: fade-in .4s ease; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.hidden { display: none !important; }
+
+/* --- Buttons --- */
+.mode-btn {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background: linear-gradient(180deg, rgba(199,154,75,0.14), rgba(199,154,75,0.05));
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  font-family: 'Cormorant SC', serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  border-radius: 2px;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.mode-btn:hover { background: rgba(199,154,75,0.22); transform: translateY(-1px); }
+.mode-btn:active { transform: translateY(0); }
+.mode-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.mode-btn-ghost {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: rgba(233,223,200,0.55);
+  font-family: 'Spectral', serif;
+  border-radius: 2px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.mode-btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+
+.input-field {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--parchment);
+  padding: 0.55rem 0.75rem;
+  border-radius: 2px;
+  outline: none;
+}
+.input-field:focus { border-color: var(--gold); }
+.input-field::placeholder { color: rgba(233,223,200,0.35); }
+
+.field-label { display:block; font-size: 0.75rem; color: rgba(233,223,200,0.5); margin-bottom: 0.25rem; }
+
+/* --- Dice buttons --- */
+.dice-btn {
+  aspect-ratio: 1;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line);
+  color: var(--parchment);
+  font-family: 'Cormorant SC', serif;
+  font-size: 1rem;
+  border-radius: 4px;
+  background: var(--panel);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dice-btn:hover { border-color: var(--gold); background: rgba(199,154,75,0.08); }
+.dice-btn:active { transform: scale(0.95); }
+
+/* --- Story log entries --- */
+.log-entry { padding: 0.5rem 0.75rem; border-radius: 2px; line-height: 1.55; }
+.log-dm { background: rgba(199,154,75,0.05); border-left: 2px solid var(--gold); }
+.log-action { background: rgba(255,255,255,0.02); border-left: 2px solid rgba(233,223,200,0.25); }
+.log-roll { border-left: 2px solid rgba(233,223,200,0.4); font-family: 'Cormorant SC', serif; font-size: 0.95rem; color: rgba(233,223,200,0.75); }
+.log-system { color: rgba(233,223,200,0.4); font-size: 0.85rem; font-style: italic; text-align: center; }
+
+/* --- Character sheet --- */
+.stat-row { display: flex; justify-content: space-between; padding: 0.15rem 0; border-bottom: 1px dashed var(--line); font-size: 0.9rem; }
+.hp-bar-track { background: var(--line); border-radius: 3px; height: 10px; overflow: hidden; }
+.hp-bar-fill { background: var(--blood); height: 100%; transition: width 0.3s ease; }
+.inv-item { display:flex; justify-content: space-between; align-items:center; font-size: 0.85rem; padding: 0.25rem 0.4rem; border: 1px solid var(--line); border-radius: 2px; }
+
+/* --- Modals --- */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items:center; justify-content:center; z-index: 40; padding: 1rem; }
+.modal-card { background: var(--panel); border: 1px solid var(--gold); max-width: 28rem; width: 100%; padding: 1.5rem; border-radius: 3px; }
+
+.toast { background: var(--panel); border: 1px solid var(--gold); color: var(--parchment); padding: 0.6rem 1rem; border-radius: 2px; font-size: 0.9rem; animation: fade-in 0.2s ease; }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }

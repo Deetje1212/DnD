@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verval van de Kroon — Text DnD</title>
+
+<!-- Tailwind (CDN, no build step needed for Netlify static hosting) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- PeerJS for WebRTC multiplayer sync -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<!-- Fonts: a cracked display serif for headings, a quiet humanist sans for reading -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@600;700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-ink text-parchment min-h-screen font-body antialiased">
+
+<!-- ============ SCREEN: TITLE ============ -->
+<section id="screen-title" class="screen flex items-center justify-center min-h-screen px-6">
+  <div class="max-w-xl w-full text-center">
+    <h1 class="font-display text-5xl md:text-6xl tracking-wide text-gold mb-2">Verval van de Kroon</h1>
+    <p class="text-parchment/60 mb-12 italic">een verhaal, verteld door een AI dungeon master</p>
+
+    <div class="space-y-4">
+      <button id="btn-solo" class="mode-btn">Solo spelen</button>
+      <button id="btn-multi" class="mode-btn">Multiplayer groep</button>
+      <button id="btn-settings" class="mode-btn-ghost">AI-sleutels instellen</button>
+    </div>
+
+    <p id="ai-key-status" class="mt-6 text-sm text-parchment/40"></p>
+  </div>
+</section>
+
+<!-- ============ SCREEN: MULTIPLAYER CHOICE ============ -->
+<section id="screen-multi-choice" class="screen hidden min-h-screen flex items-center justify-center px-6">
+  <div class="max-w-md w-full text-center">
+    <h2 class="font-display text-3xl text-gold mb-8">Multiplayer</h2>
+    <div class="space-y-4">
+      <button id="btn-create-room" class="mode-btn">Kamer aanmaken (host)</button>
+      <div class="flex gap-2">
+        <input id="input-room-code" placeholder="Kamercode" class="input-field flex-1 text-center tracking-widest uppercase">
+        <button id="btn-join-room" class="mode-btn !w-auto px-6">Join</button>
+      </div>
+      <button class="mode-btn-ghost back-btn" data-target="screen-title">Terug</button>
+    </div>
+    <p id="multi-status" class="mt-6 text-sm text-parchment/50"></p>
+  </div>
+</section>
+
+<!-- ============ SCREEN: LOBBY ============ -->
+<section id="screen-lobby" class="screen hidden min-h-screen flex items-center justify-center px-6">
+  <div class="max-w-lg w-full text-center">
+    <h2 class="font-display text-3xl text-gold mb-2">Wachtkamer</h2>
+    <p id="lobby-room-code" class="text-parchment/60 mb-6"></p>
+
+    <div class="mb-6">
+      <input id="input-player-name" placeholder="Jouw naam" class="input-field w-full text-center mb-3">
+      <textarea id="input-char-desc" rows="3" placeholder="Beschrijf je personage in een paar zinnen (bv. 'Een cynische half-elf schurk die opgroeide op straat, snel met een mes en snellere tong')" class="input-field w-full"></textarea>
+      <button id="btn-create-char" class="mode-btn mt-3">Personage aanmaken</button>
+    </div>
+
+    <div id="lobby-player-list" class="text-left space-y-2 mb-6"></div>
+
+    <button id="btn-start-adventure" class="mode-btn hidden">Avontuur beginnen</button>
+    <p id="lobby-hint" class="text-sm text-parchment/40 mt-4"></p>
+  </div>
+</section>
+
+<!-- ============ SCREEN: GAME (3 columns) ============ -->
+<section id="screen-game" class="screen hidden min-h-screen">
+  <div class="grid grid-cols-1 lg:grid-cols-[300px_1fr_280px] min-h-screen">
+
+    <!-- LEFT: Character sheet -->
+    <aside class="border-r border-line bg-panel/40 p-4 overflow-y-auto max-h-screen">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-display text-xl text-gold">Personage</h3>
+        <select id="select-active-sheet" class="bg-transparent text-xs text-parchment/60 border border-line rounded px-1 py-0.5"></select>
+      </div>
+      <div id="character-sheet-panel"></div>
+    </aside>
+
+    <!-- CENTER: Story / chat -->
+    <main class="flex flex-col min-h-screen">
+      <div class="px-4 py-2 border-b border-line flex items-center justify-between">
+        <span class="text-xs text-parchment/40" id="game-room-label"></span>
+        <span id="ai-provider-indicator" class="text-xs text-parchment/40"></span>
+      </div>
+      <div id="story-log" class="flex-1 overflow-y-auto px-4 py-4 space-y-3"></div>
+      <div class="border-t border-line p-3">
+        <div class="flex gap-2">
+          <input id="input-action" placeholder="Wat doe je?" class="input-field flex-1">
+          <button id="btn-send-action" class="mode-btn !w-auto px-5">Stuur</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT: Dice roller + party status -->
+    <aside class="border-l border-line bg-panel/40 p-4 overflow-y-auto max-h-screen">
+      <h3 class="font-display text-xl text-gold mb-3">Dobbelstenen</h3>
+      <div id="dice-buttons" class="grid grid-cols-3 gap-2 mb-3"></div>
+      <div class="flex gap-2 mb-6">
+        <input id="dice-modifier" type="number" value="0" class="input-field w-full text-center" placeholder="modifier">
+      </div>
+
+      <h3 class="font-display text-xl text-gold mb-3">Groep</h3>
+      <div id="party-status" class="space-y-2"></div>
+    </aside>
+
+  </div>
+</section>
+
+<!-- ============ MODAL: AI settings ============ -->
+<div id="modal-settings" class="modal hidden">
+  <div class="modal-card">
+    <h3 class="font-display text-2xl text-gold mb-3">AI-sleutels</h3>
+    <p class="text-sm text-parchment/60 mb-4">Deze sleutels worden alleen lokaal in je browser opgeslagen (localStorage), nooit verzonden naar iets anders dan Groq/Google, en nooit meegecompileerd in de broncode. In een multiplayer kamer gebruikt alleen de host zijn sleutels om de AI DM aan te sturen.</p>
+    <label class="field-label">Groq keys (één per regel, tot 3)</label>
+    <textarea id="settings-groq" rows="3" class="input-field w-full mb-3" placeholder="gsk_..."></textarea>
+    <label class="field-label">Gemini keys (één per regel, tot 2)</label>
+    <textarea id="settings-gemini" rows="2" class="input-field w-full mb-4" placeholder="AIza..."></textarea>
+    <div class="flex gap-2 justify-end">
+      <button id="btn-settings-cancel" class="mode-btn-ghost !w-auto px-4">Sluiten</button>
+      <button id="btn-settings-save" class="mode-btn !w-auto px-4">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: Loot offer ============ -->
+<div id="modal-loot" class="modal hidden">
+  <div class="modal-card text-center">
+    <h3 class="font-display text-2xl text-gold mb-2">Een vondst</h3>
+    <p id="loot-item-name" class="text-lg text-parchment mb-1"></p>
+    <p id="loot-item-desc" class="text-sm text-parchment/60 mb-6"></p>
+    <div class="flex gap-3 justify-center">
+      <button id="btn-loot-decline" class="mode-btn-ghost !w-auto px-5">Laten liggen</button>
+      <button id="btn-loot-accept" class="mode-btn !w-auto px-5">Oppakken</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: manual inventory edit ============ -->
+<div id="modal-inventory" class="modal hidden">
+  <div class="modal-card">
+    <h3 class="font-display text-2xl text-gold mb-3">Inventaris bewerken</h3>
+    <div class="flex gap-2 mb-4">
+      <input id="inv-item-name" placeholder="Itemnaam" class="input-field flex-1">
+      <button id="btn-inv-add" class="mode-btn !w-auto px-4">Toevoegen</button>
+    </div>
+    <div id="inv-current-list" class="space-y-1 max-h-60 overflow-y-auto mb-4"></div>
+    <div class="flex justify-end">
+      <button id="btn-inv-close" class="mode-btn-ghost !w-auto px-4">Sluiten</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
+
+<script src="js/utils.js"></script>
+<script src="js/aiManager.js"></script>
+<script src="js/character.js"></script>
+<script src="js/dice.js"></script>
+<script src="js/multiplayer.js"></script>
+<script src="js/dm.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
