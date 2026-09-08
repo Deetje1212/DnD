@@ -96,7 +96,11 @@ class AIManager {
         'Authorization': `Bearer ${key}`
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        // Model-ID: llama-3.3-70b-versatile is per 16 augustus 2026
+        // gedecommissioned door Groq. Check
+        // https://console.groq.com/docs/deprecations als je hier ooit
+        // weer een fout over een onbekend/verwijderd model ziet.
+        model: 'openai/gpt-oss-120b',
         messages,
         temperature: 0.9,
         max_tokens: 1200
@@ -133,8 +137,13 @@ class AIManager {
       generationConfig: { temperature: 0.9, maxOutputTokens: 1200 }
     };
 
+    // Model-ID: Google vervangt deze best regelmatig (gemini-2.0-flash is
+    // bv. per 1 juni 2026 helemaal uitgezet, met een 404 als gevolg).
+    // Dit is de actuele GA-versie op het moment van schrijven; check
+    // https://ai.google.dev/gemini-api/docs/models als je hier ooit weer
+    // een "model not found"-fout ziet.
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
