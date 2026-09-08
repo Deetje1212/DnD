@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Verval van de Kroon — Text DnD</title>
+<title>Fall of the Crown — Text DnD</title>
 
 <!-- Tailwind (CDN, no build step needed for Netlify static hosting) -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -20,13 +20,13 @@
 <!-- ============ SCREEN: TITLE ============ -->
 <section id="screen-title" class="screen flex items-center justify-center min-h-screen px-6">
   <div class="max-w-xl w-full text-center">
-    <h1 class="font-display text-5xl md:text-6xl tracking-wide text-gold mb-2">Verval van de Kroon</h1>
-    <p class="text-parchment/60 mb-12 italic">een verhaal, verteld door een AI dungeon master</p>
+    <h1 class="font-display text-5xl md:text-6xl tracking-wide text-gold mb-2">Fall of the Crown</h1>
+    <p class="text-parchment/60 mb-12 italic">a story, told by an AI dungeon master</p>
 
     <div class="space-y-4">
-      <button id="btn-solo" class="mode-btn">Solo spelen</button>
-      <button id="btn-multi" class="mode-btn">Multiplayer groep</button>
-      <button id="btn-settings" class="mode-btn-ghost">AI-sleutels instellen</button>
+      <button id="btn-solo" class="mode-btn">Play solo</button>
+      <button id="btn-multi" class="mode-btn">Multiplayer party</button>
+      <button id="btn-settings" class="mode-btn-ghost">Set AI keys</button>
     </div>
 
     <p id="ai-key-status" class="mt-6 text-sm text-parchment/40"></p>
@@ -38,12 +38,12 @@
   <div class="max-w-md w-full text-center">
     <h2 class="font-display text-3xl text-gold mb-8">Multiplayer</h2>
     <div class="space-y-4">
-      <button id="btn-create-room" class="mode-btn">Kamer aanmaken (host)</button>
+      <button id="btn-create-room" class="mode-btn">Create room (host)</button>
       <div class="flex gap-2">
-        <input id="input-room-code" placeholder="Kamercode" class="input-field flex-1 text-center tracking-widest uppercase">
+        <input id="input-room-code" placeholder="Room code" class="input-field flex-1 text-center tracking-widest uppercase">
         <button id="btn-join-room" class="mode-btn !w-auto px-6">Join</button>
       </div>
-      <button class="mode-btn-ghost back-btn" data-target="screen-title">Terug</button>
+      <button class="mode-btn-ghost back-btn" data-target="screen-title">Back</button>
     </div>
     <p id="multi-status" class="mt-6 text-sm text-parchment/50"></p>
   </div>
@@ -52,18 +52,18 @@
 <!-- ============ SCREEN: LOBBY ============ -->
 <section id="screen-lobby" class="screen hidden min-h-screen flex items-center justify-center px-6">
   <div class="max-w-lg w-full text-center">
-    <h2 class="font-display text-3xl text-gold mb-2">Wachtkamer</h2>
+    <h2 class="font-display text-3xl text-gold mb-2">Waiting Room</h2>
     <p id="lobby-room-code" class="text-parchment/60 mb-6"></p>
 
     <div class="mb-6">
-      <input id="input-player-name" placeholder="Jouw naam" class="input-field w-full text-center mb-3">
-      <textarea id="input-char-desc" rows="3" placeholder="Beschrijf je personage in een paar zinnen (bv. 'Een cynische half-elf schurk die opgroeide op straat, snel met een mes en snellere tong')" class="input-field w-full"></textarea>
-      <button id="btn-create-char" class="mode-btn mt-3">Personage aanmaken</button>
+      <input id="input-player-name" placeholder="Your name" class="input-field w-full text-center mb-3">
+      <textarea id="input-char-desc" rows="3" placeholder="Describe your character in a few sentences (e.g. 'A cynical half-elf rogue who grew up on the streets, quick with a knife and a quicker tongue')" class="input-field w-full"></textarea>
+      <button id="btn-create-char" class="mode-btn mt-3">Create character</button>
     </div>
 
     <div id="lobby-player-list" class="text-left space-y-2 mb-6"></div>
 
-    <button id="btn-start-adventure" class="mode-btn hidden">Avontuur beginnen</button>
+    <button id="btn-start-adventure" class="mode-btn hidden">Start adventure</button>
     <p id="lobby-hint" class="text-sm text-parchment/40 mt-4"></p>
   </div>
 </section>
@@ -75,7 +75,7 @@
     <!-- LEFT: Character sheet -->
     <aside class="border-r border-line bg-panel/40 p-4 overflow-y-auto max-h-screen">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="font-display text-xl text-gold">Personage</h3>
+        <h3 class="font-display text-xl text-gold">Character</h3>
         <select id="select-active-sheet" class="bg-transparent text-xs text-parchment/60 border border-line rounded px-1 py-0.5"></select>
       </div>
       <div id="character-sheet-panel"></div>
@@ -90,21 +90,21 @@
       <div id="story-log" class="flex-1 overflow-y-auto px-4 py-4 space-y-3"></div>
       <div class="border-t border-line p-3">
         <div class="flex gap-2">
-          <input id="input-action" placeholder="Wat doe je?" class="input-field flex-1">
-          <button id="btn-send-action" class="mode-btn !w-auto px-5">Stuur</button>
+          <input id="input-action" placeholder="What do you do?" class="input-field flex-1">
+          <button id="btn-send-action" class="mode-btn !w-auto px-5">Send</button>
         </div>
       </div>
     </main>
 
     <!-- RIGHT: Dice roller + party status -->
     <aside class="border-l border-line bg-panel/40 p-4 overflow-y-auto max-h-screen">
-      <h3 class="font-display text-xl text-gold mb-3">Dobbelstenen</h3>
+      <h3 class="font-display text-xl text-gold mb-3">Dice</h3>
       <div id="dice-buttons" class="grid grid-cols-3 gap-2 mb-3"></div>
       <div class="flex gap-2 mb-6">
         <input id="dice-modifier" type="number" value="0" class="input-field w-full text-center" placeholder="modifier">
       </div>
 
-      <h3 class="font-display text-xl text-gold mb-3">Groep</h3>
+      <h3 class="font-display text-xl text-gold mb-3">Party</h3>
       <div id="party-status" class="space-y-2"></div>
     </aside>
 
@@ -114,15 +114,15 @@
 <!-- ============ MODAL: AI settings ============ -->
 <div id="modal-settings" class="modal hidden">
   <div class="modal-card">
-    <h3 class="font-display text-2xl text-gold mb-3">AI-sleutels</h3>
-    <p class="text-sm text-parchment/60 mb-4">Deze sleutels worden alleen lokaal in je browser opgeslagen (localStorage), nooit verzonden naar iets anders dan Groq/Google, en nooit meegecompileerd in de broncode. In een multiplayer kamer gebruikt alleen de host zijn sleutels om de AI DM aan te sturen.</p>
-    <label class="field-label">Groq keys (één per regel, tot 3)</label>
+    <h3 class="font-display text-2xl text-gold mb-3">AI Keys</h3>
+    <p class="text-sm text-parchment/60 mb-4">These keys are only stored locally in your browser (localStorage), never sent anywhere other than Groq/Google, and never compiled into the source code. In a multiplayer room, only the host uses their keys to drive the AI DM.</p>
+    <label class="field-label">Groq keys (one per line, up to 3)</label>
     <textarea id="settings-groq" rows="3" class="input-field w-full mb-3" placeholder="gsk_..."></textarea>
-    <label class="field-label">Gemini keys (één per regel, tot 2)</label>
+    <label class="field-label">Gemini keys (one per line, up to 2)</label>
     <textarea id="settings-gemini" rows="2" class="input-field w-full mb-4" placeholder="AIza..."></textarea>
     <div class="flex gap-2 justify-end">
-      <button id="btn-settings-cancel" class="mode-btn-ghost !w-auto px-4">Sluiten</button>
-      <button id="btn-settings-save" class="mode-btn !w-auto px-4">Opslaan</button>
+      <button id="btn-settings-cancel" class="mode-btn-ghost !w-auto px-4">Close</button>
+      <button id="btn-settings-save" class="mode-btn !w-auto px-4">Save</button>
     </div>
   </div>
 </div>
@@ -130,12 +130,12 @@
 <!-- ============ MODAL: Loot offer ============ -->
 <div id="modal-loot" class="modal hidden">
   <div class="modal-card text-center">
-    <h3 class="font-display text-2xl text-gold mb-2">Een vondst</h3>
+    <h3 class="font-display text-2xl text-gold mb-2">A Find</h3>
     <p id="loot-item-name" class="text-lg text-parchment mb-1"></p>
     <p id="loot-item-desc" class="text-sm text-parchment/60 mb-6"></p>
     <div class="flex gap-3 justify-center">
-      <button id="btn-loot-decline" class="mode-btn-ghost !w-auto px-5">Laten liggen</button>
-      <button id="btn-loot-accept" class="mode-btn !w-auto px-5">Oppakken</button>
+      <button id="btn-loot-decline" class="mode-btn-ghost !w-auto px-5">Leave it</button>
+      <button id="btn-loot-accept" class="mode-btn !w-auto px-5">Pick up</button>
     </div>
   </div>
 </div>
@@ -143,14 +143,14 @@
 <!-- ============ MODAL: manual inventory edit ============ -->
 <div id="modal-inventory" class="modal hidden">
   <div class="modal-card">
-    <h3 class="font-display text-2xl text-gold mb-3">Inventaris bewerken</h3>
+    <h3 class="font-display text-2xl text-gold mb-3">Edit Inventory</h3>
     <div class="flex gap-2 mb-4">
-      <input id="inv-item-name" placeholder="Itemnaam" class="input-field flex-1">
-      <button id="btn-inv-add" class="mode-btn !w-auto px-4">Toevoegen</button>
+      <input id="inv-item-name" placeholder="Item name" class="input-field flex-1">
+      <button id="btn-inv-add" class="mode-btn !w-auto px-4">Add</button>
     </div>
     <div id="inv-current-list" class="space-y-1 max-h-60 overflow-y-auto mb-4"></div>
     <div class="flex justify-end">
-      <button id="btn-inv-close" class="mode-btn-ghost !w-auto px-4">Sluiten</button>
+      <button id="btn-inv-close" class="mode-btn-ghost !w-auto px-4">Close</button>
     </div>
   </div>
 </div>

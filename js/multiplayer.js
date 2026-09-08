@@ -1,22 +1,22 @@
 /**
- * MultiplayerManager — WebRTC (PeerJS) sync via een ster-topologie:
- * elke speler verbindt met de host, de host relayt berichten naar
- * iedereen. Dit voorkomt dubbele AI-aanroepen (alleen de host praat
- * met de AI DM) en houdt de game-state consistent.
+ * MultiplayerManager — WebRTC (PeerJS) sync via a star topology: every
+ * player connects to the host, and the host relays messages to
+ * everyone. This avoids duplicate AI calls (only the host talks to the
+ * AI DM) and keeps the game state consistent.
  *
- * Roomcode = het PeerJS peer-ID van de host (verkort en leesbaar
- * gemaakt), gratis via de openbare PeerJS signaling server — geen
- * eigen backend nodig, dus perfect voor Netlify static hosting.
+ * Room code = the host's PeerJS peer ID (shortened and made readable),
+ * free via the public PeerJS signaling server — no backend of our own
+ * needed, so it's a perfect fit for Netlify static hosting.
  */
 class MultiplayerManager {
   constructor() {
     this.peer = null;
     this.isHost = false;
     this.roomCode = null;
-    this.myId = null;         // ons eigen speler-uuid (los van peer-id)
+    this.myId = null;         // our own player uuid (separate from the peer id)
     this.myName = null;
     this.conns = new Map();   // host: peerId -> DataConnection
-    this.hostConn = null;     // peer (non-host): connectie naar host
+    this.hostConn = null;     // peer (non-host): connection to the host
     this.handlers = {};       // event type -> [callbacks]
     this.connectedPlayerIds = new Set();
   }
@@ -30,12 +30,12 @@ class MultiplayerManager {
   }
 
   _randomRoomCode() {
-    const words = ['drakon', 'runen', 'schim', 'gilde', 'zwerf', 'krypt', 'vloek', 'aslot'];
+    const words = ['dragon', 'runes', 'shade', 'guild', 'rogue', 'crypt', 'curse', 'ashfall'];
     const w = words[Math.floor(Math.random() * words.length)];
     return `dnd-${w}-${Math.floor(1000 + Math.random() * 9000)}`;
   }
 
-  /** Start als host: maakt kamer aan, retourneert een Promise<roomCode>. */
+  /** Starts as host: creates a room, returns a Promise<roomCode>. */
   hostRoom(playerName) {
     return new Promise((resolve, reject) => {
       this.isHost = true;
@@ -60,7 +60,7 @@ class MultiplayerManager {
     });
   }
 
-  /** Join een bestaande kamer via de roomcode (= host's peer-id). */
+  /** Joins an existing room via the room code (= the host's peer id). */
   joinRoom(roomCode, playerName) {
     return new Promise((resolve, reject) => {
       this.isHost = false;
@@ -87,32 +87,32 @@ class MultiplayerManager {
     if (!msg || !msg.type) return;
 
     if (this.isHost) {
-      // Zorg dat de connectie gekoppeld is aan de speler-uuid uit het bericht
+      // Make sure the connection is linked to the player uuid from the message
       if (msg.type === 'hello') {
         this.connectedPlayerIds.add(msg.payload.playerId);
       }
       this._emit(msg.type, msg.payload, msg.senderId);
 
-      // Host relayt deze berichttypes automatisch door naar alle ANDERE
-      // peers (de afzender heeft de wijziging zelf al optimistisch
-      // lokaal toegepast, en de host past 'm hierboven al toe via _emit).
-      // 'action' en 'char_request' zijn uitgesloten: die vereisen eerst
-      // een AI-aanroep door de host, waarna de host zelf een nieuw
-      // bericht (dm_response / character_created) uitzendt.
+      // The host automatically relays these message types to all OTHER
+      // peers (the sender already applied the change locally and
+      // optimistically, and the host already applies it above via _emit).
+      // 'action' and 'char_request' are excluded: those first require an
+      // AI call by the host, after which the host itself broadcasts a
+      // new message (dm_response / character_created).
       const relayDirect = ['roll', 'loot_response', 'inventory_update'];
       if (relayDirect.includes(msg.type)) {
         this.broadcast(msg.type, msg.payload, msg.senderId, /* excludeSender */ conn.peer);
       }
     } else {
-      // Als peer ontvangen we alleen van de host — relay 1-op-1 naar onze handlers
+      // As a peer we only receive from the host — relay 1-to-1 to our handlers
       this._emit(msg.type, msg.payload, msg.senderId);
     }
   }
 
   /**
-   * Stuur een bericht naar de host (alleen zinvol als je zelf een peer bent).
-   * Past NIETS lokaal toe — de aanroepende code is verantwoordelijk voor de
-   * eigen optimistische lokale update (zie main.js: dispatch()).
+   * Sends a message to the host (only meaningful if you're a peer yourself).
+   * Applies NOTHING locally — the calling code is responsible for its own
+   * optimistic local update (see main.js: dispatch()).
    */
   send(type, payload) {
     if (this.isHost || !this.hostConn) return;
@@ -120,9 +120,9 @@ class MultiplayerManager {
   }
 
   /**
-   * Alleen host: stuur naar alle verbonden peers (optioneel er één
-   * uitsluiten, bv. de oorspronkelijke afzender die het al lokaal heeft
-   * toegepast). Past NIETS lokaal toe bij de host zelf.
+   * Host only: send to all connected peers (optionally excluding one,
+   * e.g. the original sender who already applied it locally). Applies
+   * NOTHING locally on the host itself.
    */
   broadcast(type, payload, senderId = this.myId, excludePeerId = null) {
     if (!this.isHost) return;

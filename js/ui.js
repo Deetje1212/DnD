@@ -1,6 +1,6 @@
 /**
- * UI — pure rendering functies. Leest uit App.state (main.js), schrijft
- * naar het DOM. Bevat geen netwerk- of AI-logica.
+ * UI — pure rendering functions. Reads from App.state (main.js), writes
+ * to the DOM. Contains no networking or AI logic.
  */
 const UI = {
   showScreen(id) {
@@ -30,7 +30,7 @@ const UI = {
       row.innerHTML = `
         <span>${escapeHtml(p.name)}</span>
         <span class="text-xs ${p.character ? 'text-forest' : 'text-parchment/40'}">
-          ${p.character ? `${escapeHtml(p.character.class)} klaar` : 'nog geen personage'}
+          ${p.character ? `${escapeHtml(p.character.class)} ready` : 'no character yet'}
         </span>`;
       el.appendChild(row);
     });
@@ -77,19 +77,20 @@ const UI = {
   renderCharacterSheet(character) {
     const el = document.getElementById('character-sheet-panel');
     if (!character) {
-      el.innerHTML = `<p class="text-sm text-parchment/40">Nog geen personage.</p>`;
+      el.innerHTML = `<p class="text-sm text-parchment/40">No character yet.</p>`;
       return;
     }
     const c = character;
+    const isDead = CharacterFactory.isDead(c);
     const hpPct = Math.max(0, Math.min(100, (c.hp.current / c.hp.max) * 100));
     el.innerHTML = `
-      <div class="mb-3">
-        <p class="font-display text-2xl leading-tight">${escapeHtml(c.name)}</p>
+      <div class="mb-3 ${isDead ? 'opacity-50' : ''}">
+        <p class="font-display text-2xl leading-tight">${escapeHtml(c.name)} ${isDead ? '<span class="text-blood text-base align-middle">☠ DEAD</span>' : ''}</p>
         <p class="text-xs text-parchment/50">${escapeHtml(c.race)} ${escapeHtml(c.class)} · Level ${c.level}</p>
       </div>
       <div class="mb-3">
         <div class="flex justify-between text-xs mb-1"><span>HP</span><span>${c.hp.current} / ${c.hp.max}</span></div>
-        <div class="hp-bar-track"><div class="hp-bar-fill" style="width:${hpPct}%"></div></div>
+        <div class="hp-bar-track"><div class="hp-bar-fill ${isDead ? 'hp-bar-dead' : ''}" style="width:${hpPct}%"></div></div>
       </div>
       <div class="grid grid-cols-3 gap-x-2 mb-4">
         ${Object.entries(c.stats).map(([k, v]) => `
@@ -100,12 +101,12 @@ const UI = {
       </div>
       ${c.skills.length ? `
       <div class="mb-4">
-        <p class="text-xs text-parchment/50 mb-1">Vaardigheden</p>
+        <p class="text-xs text-parchment/50 mb-1">Skills</p>
         <p class="text-sm">${c.skills.map(escapeHtml).join(' · ')}</p>
       </div>` : ''}
       ${(c.spells && c.spells.length) ? `
       <div class="mb-4">
-        <p class="text-xs text-parchment/50 mb-1">Spreuken</p>
+        <p class="text-xs text-parchment/50 mb-1">Spells</p>
         <div class="space-y-1">
           ${c.spells.map(s => `
             <div class="inv-item" title="${escapeHtml(s.description || '')}">${escapeHtml(s.name)}</div>
@@ -113,13 +114,13 @@ const UI = {
         </div>
       </div>` : ''}
       <div class="mb-2 flex items-center justify-between">
-        <p class="text-xs text-parchment/50">Inventaris</p>
-        <button id="btn-open-inventory" class="text-xs text-gold hover:underline">bewerken</button>
+        <p class="text-xs text-parchment/50">Inventory</p>
+        <button id="btn-open-inventory" class="text-xs text-gold hover:underline">edit</button>
       </div>
       <div class="space-y-1">
         ${c.inventory.length ? c.inventory.map(i => `
           <div class="inv-item" title="${escapeHtml(i.description || '')}">${escapeHtml(i.name)}</div>
-        `).join('') : `<p class="text-xs text-parchment/30 italic">leeg</p>`}
+        `).join('') : `<p class="text-xs text-parchment/30 italic">empty</p>`}
       </div>
     `;
   },
@@ -131,7 +132,7 @@ const UI = {
     Object.values(players).filter(p => p.character).forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.id;
-      opt.textContent = p.id === myId ? `${p.name} (jij)` : p.name;
+      opt.textContent = p.id === myId ? `${p.name} (you)` : p.name;
       sel.appendChild(opt);
     });
     if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
@@ -146,15 +147,16 @@ const UI = {
       const row = document.createElement('div');
       row.className = 'text-sm border border-line rounded px-2 py-1.5';
       if (p.character) {
+        const isDead = CharacterFactory.isDead(p.character);
         const hpPct = Math.max(0, Math.min(100, (p.character.hp.current / p.character.hp.max) * 100));
         row.innerHTML = `
-          <div class="flex justify-between mb-1">
-            <span>${escapeHtml(p.character.name)}</span>
+          <div class="flex justify-between mb-1 ${isDead ? 'opacity-50' : ''}">
+            <span>${escapeHtml(p.character.name)} ${isDead ? '<span class="text-blood">☠</span>' : ''}</span>
             <span class="text-parchment/50">Lv${p.character.level}</span>
           </div>
-          <div class="hp-bar-track"><div class="hp-bar-fill" style="width:${hpPct}%"></div></div>`;
+          <div class="hp-bar-track"><div class="hp-bar-fill ${isDead ? 'hp-bar-dead' : ''}" style="width:${hpPct}%"></div></div>`;
       } else {
-        row.innerHTML = `<span class="text-parchment/40">${escapeHtml(p.name)} — personage wordt aangemaakt...</span>`;
+        row.innerHTML = `<span class="text-parchment/40">${escapeHtml(p.name)} — character being created...</span>`;
       }
       el.appendChild(row);
     });

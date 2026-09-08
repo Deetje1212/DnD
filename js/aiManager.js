@@ -1,12 +1,12 @@
 /**
- * AIManager — robuuste multi-key, multi-provider rotator.
+ * AIManager — robust multi-key, multi-provider rotator.
  */
 class AIManager {
   constructor() {
     this.groqKeys = [];
     this.geminiKeys = [];
-    this.lastUsed = null; // {provider, index} — voor de UI-indicator
-    this.deadKeys = new Set(); // "provider:index" die deze sessie al faalden
+    this.lastUsed = null; // {provider, index} — for the UI indicator
+    this.deadKeys = new Set(); // "provider:index" that already failed this session
     this.loadFromStorage();
   }
 
@@ -18,12 +18,12 @@ class AIManager {
         this.groqKeys = (parsed.groq || []).filter(Boolean).slice(0, 3);
         this.geminiKeys = (parsed.gemini || []).filter(Boolean).slice(0, 2);
       }
-    } catch (e) { /* corrupte opslag negeren */ }
+    } catch (e) { /* ignore corrupt storage */ }
   }
 
   saveToStorage(groqKeys = [], geminiKeys = []) {
-    // Sleutels altijd eerst in het geheugen zetten: zelfs als localStorage
-    // hieronder faalt, werkt de app gewoon door voor de rest van deze sessie.
+    // Always set the keys in memory first: even if localStorage fails
+    // below, the app just keeps working for the rest of this session.
     this.groqKeys = groqKeys.filter(Boolean).slice(0, 3);
     this.geminiKeys = geminiKeys.filter(Boolean).slice(0, 2);
     this.deadKeys.clear();
@@ -31,13 +31,13 @@ class AIManager {
       localStorage.setItem('dnd_ai_keys', JSON.stringify({
         groq: this.groqKeys, gemini: this.geminiKeys
       }));
-      return true; // gelukt: blijft ook na herladen bewaard
+      return true; // succeeded: also persists after a reload
     } catch (e) {
-      // localStorage kan geblokkeerd zijn (privémodus, browserinstellingen,
-      // bepaalde embedded webviews, enz.) — dat mag de rest van de app
-      // niet stuk maken.
-      console.warn('[AIManager] kon sleutels niet lokaal opslaan:', e);
-      return false; // sleutels werken nog wel voor deze sessie
+      // localStorage can be blocked (private mode, browser settings,
+      // certain embedded webviews, etc.) — that shouldn't break the
+      // rest of the app.
+      console.warn('[AIManager] could not save keys locally:', e);
+      return false; // keys still work for this session
     }
   }
 
@@ -61,7 +61,7 @@ class AIManager {
   async chat(messages) {
     const candidates = this._candidateList();
     if (candidates.length === 0) {
-      throw new Error('Geen AI-sleutels ingesteld. Klik op "AI-sleutels instellen" op het titelscherm.');
+      throw new Error('No AI keys set. Click "Set AI keys" on the title screen.');
     }
 
     let lastError = null;
@@ -79,13 +79,13 @@ class AIManager {
         lastError = err;
         if (err.failoverWorthy) {
           this.deadKeys.add(dedupeKey);
-          console.warn(`[AIManager] key ${dedupeKey} faalde (${err.message}), schakel over naar volgende...`);
+          console.warn(`[AIManager] key ${dedupeKey} failed (${err.message}), switching to the next one...`);
           continue;
         }
         continue;
       }
     }
-    throw new Error('Alle AI-sleutels zijn uitgeput of ongeldig. Laatste fout: ' + (lastError?.message || 'onbekend'));
+    throw new Error('All AI keys are exhausted or invalid. Last error: ' + (lastError?.message || 'unknown'));
   }
 
   async _callGroq(key, messages) {
@@ -96,10 +96,10 @@ class AIManager {
         'Authorization': `Bearer ${key}`
       },
       body: JSON.stringify({
-        // Model-ID: llama-3.3-70b-versatile is per 16 augustus 2026
-        // gedecommissioned door Groq. Check
-        // https://console.groq.com/docs/deprecations als je hier ooit
-        // weer een fout over een onbekend/verwijderd model ziet.
+        // Model ID: llama-3.3-70b-versatile was decommissioned by Groq
+        // as of August 16, 2026. Check
+        // https://console.groq.com/docs/deprecations if you ever see
+        // an unknown/removed model error here again.
         model: 'openai/gpt-oss-120b',
         messages,
         temperature: 0.9,
@@ -120,7 +120,7 @@ class AIManager {
     const systemMsg = messages.find(m => m.role === 'system');
     const rest = messages.filter(m => m.role !== 'system');
 
-    // Voorkom opeenvolgende dubbele rollen voor Gemini
+    // Prevent consecutive duplicate roles for Gemini
     const contents = [];
     for (const m of rest) {
       const role = m.role === 'assistant' ? 'model' : 'user';
@@ -137,11 +137,11 @@ class AIManager {
       generationConfig: { temperature: 0.9, maxOutputTokens: 1200 }
     };
 
-    // Model-ID: Google vervangt deze best regelmatig (gemini-2.0-flash is
-    // bv. per 1 juni 2026 helemaal uitgezet, met een 404 als gevolg).
-    // Dit is de actuele GA-versie op het moment van schrijven; check
-    // https://ai.google.dev/gemini-api/docs/models als je hier ooit weer
-    // een "model not found"-fout ziet.
+    // Model ID: Google replaces this fairly regularly (e.g. gemini-2.0-flash
+    // was fully retired as of June 1, 2026, resulting in a 404). This is
+    // the current GA version at the time of writing; check
+    // https://ai.google.dev/gemini-api/docs/models if you ever see a
+    // "model not found" error here again.
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${key}`,
       {

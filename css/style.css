@@ -107,6 +107,7 @@ body {
 .stat-row { display: flex; justify-content: space-between; padding: 0.15rem 0; border-bottom: 1px dashed var(--line); font-size: 0.9rem; }
 .hp-bar-track { background: var(--line); border-radius: 3px; height: 10px; overflow: hidden; }
 .hp-bar-fill { background: var(--blood); height: 100%; transition: width 0.3s ease; }
+.hp-bar-fill.hp-bar-dead { background: #4a4a4a; }
 .inv-item { display:flex; justify-content: space-between; align-items:center; font-size: 0.85rem; padding: 0.25rem 0.4rem; border: 1px solid var(--line); border-radius: 2px; }
 
 /* --- Modals --- */

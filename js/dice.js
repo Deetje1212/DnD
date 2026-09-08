@@ -1,5 +1,5 @@
 /**
- * Dice — virtuele dobbelstenen d4 t/m d100.
+ * Dice — virtual dice d4 through d100.
  */
 const Dice = {
   TYPES: [4, 6, 8, 10, 12, 20, 100],
@@ -8,7 +8,7 @@ const Dice = {
     return 1 + Math.floor(Math.random() * sides);
   },
 
-  /** Rolt en bouwt een leesbaar resultaatobject, incl. optionele modifier. */
+  /** Rolls and builds a readable result object, including an optional modifier. */
   rollWithModifier(sides, modifier = 0) {
     const raw = Dice.roll(sides);
     const total = raw + Number(modifier || 0);

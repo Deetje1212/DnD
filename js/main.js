@@ -1,8 +1,8 @@
 /**
- * main.js — applicatiestatus + wiring. Bevat de "dispatch"-laag die
- * ervoor zorgt dat elke actie eerst optimistisch lokaal wordt
- * toegepast, en daarna (indien van toepassing) over het netwerk
- * gedeeld wordt — zonder dubbele toepassing bij de afzender zelf.
+ * main.js — application state + wiring. Contains the "dispatch" layer
+ * that makes sure every action is applied optimistically locally first,
+ * and then (where applicable) shared over the network — without being
+ * applied twice for the sender itself.
  */
 const App = {
   state: {
@@ -10,17 +10,17 @@ const App = {
     history: []    // log entries: {type, text, player?}
   },
   myId: null,
-  myName: 'Speler',
+  myName: 'Player',
   soloMode: false,
   started: false,
-  busy: false // true terwijl er op een AI-antwoord gewacht wordt
+  busy: false // true while waiting on an AI response
 };
 
 // ============================================================
 // Dispatch layer
 // ============================================================
 function dispatch(type, payload, applyFn) {
-  applyFn(payload, App.myId); // optimistische lokale toepassing
+  applyFn(payload, App.myId); // optimistic local application
   if (App.soloMode) return;
   if (window.multiplayer.isHost) {
     window.multiplayer.broadcast(type, payload, App.myId);
@@ -35,7 +35,7 @@ function addHistory(entry) {
 }
 
 // ============================================================
-// Handlers (gedeeld tussen lokale dispatch en inkomende netwerk-events)
+// Handlers (shared between local dispatch and incoming network events)
 // ============================================================
 function applyRoll(payload) {
   addHistory({ type: 'roll', player: payload.playerName, text: payload.label });
@@ -49,13 +49,13 @@ function applyCharacterCreated(payload) {
 
 function applyLootResponse(payload) {
   if (!payload.accept) {
-    addHistory({ type: 'system', text: `${payload.playerName} laat ${payload.item.name} liggen.` });
+    addHistory({ type: 'system', text: `${payload.playerName} leaves ${payload.item.name} behind.` });
     return;
   }
   const p = App.state.players[payload.playerId];
   if (p && p.character) {
     p.character = CharacterFactory.addItem(p.character, payload.item);
-    addHistory({ type: 'system', text: `${payload.playerName} pakt ${payload.item.name} op.` });
+    addHistory({ type: 'system', text: `${payload.playerName} picks up ${payload.item.name}.` });
     refreshLobbyOrGameUI();
   }
 }
@@ -71,7 +71,7 @@ function applyInventoryUpdate(payload) {
   refreshLobbyOrGameUI();
 }
 
-/** Alleen ontvangen (nooit lokaal gedispatched) — de host is de enige die dit genereert. */
+/** Only ever received (never dispatched locally) — the host is the only one who generates this. */
 function applyDmResponse(payload) {
   addHistory({ type: 'narrative', text: payload.narrative });
 
@@ -79,8 +79,32 @@ function applyDmResponse(payload) {
     const target = findPlayerByName(lu.player);
     if (target && target.character) {
       target.character = CharacterFactory.applyLevelUp(target.character, lu);
-      addHistory({ type: 'system', text: `${target.name} bereikt level ${target.character.level}!` });
-      UI.toast(`${target.name} levelt op naar ${target.character.level}!`);
+      addHistory({ type: 'system', text: `${target.name} reaches level ${target.character.level}!` });
+      UI.toast(`${target.name} levels up to ${target.character.level}!`);
+    }
+  });
+
+  (payload.hpChanges || []).forEach(hc => {
+    const target = findPlayerByName(hc.player);
+    if (!target || !target.character) return;
+    const amount = Number(hc.amount || 0);
+    if (!amount) return;
+    const wasDead = CharacterFactory.isDead(target.character);
+    target.character = CharacterFactory.applyDamageOrHeal(target.character, amount);
+    const verb = amount < 0 ? 'takes' : 'heals';
+    const amountLabel = amount < 0 ? `${Math.abs(amount)} damage` : `${amount} HP`;
+    const reason = hc.reason ? ` (${hc.reason})` : '';
+    addHistory({ type: 'system', text: `${target.name} ${verb} ${amountLabel}${reason}. HP: ${target.character.hp.current}/${target.character.hp.max}` });
+
+    const nowDead = CharacterFactory.isDead(target.character);
+    if (nowDead && !wasDead) {
+      addHistory({ type: 'system', text: `☠ ${target.name} has died.` });
+      UI.toast(`☠ ${target.name} has died.`);
+      if (target.id === App.myId) setActionInputEnabled(false);
+    } else if (!nowDead && wasDead) {
+      addHistory({ type: 'system', text: `✚ ${target.name} is revived!` });
+      UI.toast(`✚ ${target.name} is revived!`);
+      if (target.id === App.myId && !App.busy) setActionInputEnabled(true);
     }
   });
 
@@ -101,7 +125,8 @@ function applyDmResponse(payload) {
 
   refreshLobbyOrGameUI();
   App.busy = false;
-  setActionInputEnabled(true);
+  const me = App.state.players[App.myId];
+  setActionInputEnabled(!me?.character || !CharacterFactory.isDead(me.character));
 }
 
 function findPlayerByName(playerName) {
@@ -109,13 +134,13 @@ function findPlayerByName(playerName) {
 }
 
 // ============================================================
-// Netwerk event registratie
+// Network event registration
 // ============================================================
 function wireMultiplayerEvents() {
   const mp = window.multiplayer;
 
   mp.on('hello', (payload) => {
-    // alleen host ontvangt dit
+    // only the host receives this
     App.state.players[payload.playerId] = { id: payload.playerId, name: payload.name, character: null };
     mp.broadcast('state_sync', { players: App.state.players, history: App.state.history }, App.myId);
     refreshLobbyOrGameUI();
@@ -135,14 +160,14 @@ function wireMultiplayerEvents() {
   mp.on('dm_response', (payload) => applyDmResponse(payload));
 
   mp.on('action', async (payload, fromId) => {
-    // Alleen de host verwerkt dit: roept de AI aan en zendt het resultaat uit.
+    // Only the host processes this: calls the AI and broadcasts the result.
     if (!mp.isHost) return;
     addHistory({ type: 'action', player: payload.playerName, text: payload.text });
     mp.broadcast('action_echo', payload, fromId);
     await runDmTurn(payload.playerName, payload.text);
   });
   mp.on('action_echo', (payload, fromId) => {
-    if (fromId === App.myId) return; // eigen actie al lokaal getoond
+    if (fromId === App.myId) return; // own action already shown locally
     addHistory({ type: 'action', player: payload.playerName, text: payload.text });
   });
 
@@ -150,7 +175,7 @@ function wireMultiplayerEvents() {
 }
 
 // ============================================================
-// AI-aanroepen (alleen host / solo voert deze uit)
+// AI calls (only host / solo performs these)
 // ============================================================
 async function runDmTurn(actingPlayerName, actionText) {
   try {
@@ -159,11 +184,11 @@ async function runDmTurn(actingPlayerName, actionText) {
       applyDmResponse(result);
     } else {
       window.multiplayer.broadcast('dm_response', result, App.myId);
-      applyDmResponse(result); // host past ook lokaal toe
+      applyDmResponse(result); // host also applies it locally
     }
   } catch (err) {
     console.error(err);
-    addHistory({ type: 'system', text: `⚠ De AI DM kon niet antwoorden: ${err.message}` });
+    addHistory({ type: 'system', text: `⚠ The AI DM could not respond: ${err.message}` });
     App.busy = false;
     setActionInputEnabled(true);
   }
@@ -184,8 +209,8 @@ function refreshLobbyOrGameUI() {
       startBtn.classList.toggle('hidden', !allReady);
     }
     document.getElementById('lobby-hint').textContent = allReady
-      ? (App.soloMode || window.multiplayer.isHost ? 'Iedereen is klaar — begin het avontuur!' : 'Wachten tot de host het avontuur start...')
-      : 'Wachten tot iedereen een personage heeft aangemaakt...';
+      ? (App.soloMode || window.multiplayer.isHost ? 'Everyone is ready — start the adventure!' : 'Waiting for the host to start the adventure...')
+      : 'Waiting for everyone to create a character...';
   }
   if (!document.getElementById('screen-game').classList.contains('hidden')) {
     if (!activeSheetId || !App.state.players[activeSheetId]) activeSheetId = App.myId;
@@ -233,35 +258,35 @@ document.addEventListener('DOMContentLoaded', () => {
     wireStaticButtons();
     updateKeyStatus();
   } catch (err) {
-    // Als het bekabelen van de knoppen zelf al faalt, willen we dat
-    // zeker zien in plaats van een pagina die er levend uitziet maar
-    // waarop niets werkt.
-    console.error('[App] Kon de UI niet volledig initialiseren:', err);
-    if (window.UI) UI.toast('⚠ De pagina kon niet volledig laden: ' + err.message);
+    // If wiring up the buttons itself already fails, we definitely want
+    // to surface that instead of a page that looks alive but where
+    // nothing actually works.
+    console.error('[App] Could not fully initialize the UI:', err);
+    if (window.UI) UI.toast('⚠ The page could not fully load: ' + err.message);
   }
 });
 
-// Vangnet voor écht onverwachte fouten buiten de knop-handlers om
-// (bv. een ontbrekend script, een CDN die niet laadt) — zorgt dat
-// zoiets zichtbaar wordt i.p.v. een pagina die stil niets meer doet.
+// Safety net for truly unexpected errors outside the button handlers
+// (e.g. a missing script, a CDN that fails to load) — makes sure that
+// becomes visible instead of a page that silently stops doing anything.
 window.addEventListener('error', (e) => {
-  console.error('[App] Onverwachte fout:', e.error || e.message);
+  console.error('[App] Unexpected error:', e.error || e.message);
 });
 
 function updateKeyStatus() {
   const el = document.getElementById('ai-key-status');
   el.textContent = window.aiManager.hasAnyKey()
-    ? '✓ AI-sleutels ingesteld'
-    : '⚠ Nog geen AI-sleutels ingesteld — klik hieronder';
+    ? '✓ AI keys set'
+    : '⚠ No AI keys set yet — click below';
 }
 
 function wireStaticButtons() {
-  // --- terugknoppen ---
+  // --- back buttons ---
   document.querySelectorAll('.back-btn').forEach(btn => {
     btn.addEventListener('click', safeHandler(() => UI.showScreen(btn.dataset.target)));
   });
 
-  // --- instellingen modal ---
+  // --- settings modal ---
   document.getElementById('btn-settings').addEventListener('click', safeHandler(() => {
     document.getElementById('settings-groq').value = window.aiManager.groqKeys.join('\n');
     document.getElementById('settings-gemini').value = window.aiManager.geminiKeys.join('\n');
@@ -275,16 +300,16 @@ function wireStaticButtons() {
     updateKeyStatus();
     UI.hideModal('modal-settings');
     UI.toast(persisted
-      ? 'AI-sleutels opgeslagen (lokaal in je browser).'
-      : 'Sleutels ingesteld voor deze sessie — lokaal opslaan lukte niet in deze browser (bv. privémodus), dus na herladen moet je ze opnieuw invullen.');
+      ? 'AI keys saved (locally in your browser).'
+      : 'Keys set for this session — saving locally failed in this browser (e.g. private mode), so you\'ll need to re-enter them after reloading.');
   }));
 
   // --- solo ---
   document.getElementById('btn-solo').addEventListener('click', safeHandler(() => {
     if (!window.aiManager.hasAnyKey()) {
-      UI.toast('Stel eerst een AI-sleutel in.');
-      // Meteen de instellingen-modal openen zodat de speler niet zelf
-      // hoeft te zoeken naar de juiste knop.
+      UI.toast('Set an AI key first.');
+      // Open the settings modal right away so the player doesn't have to
+      // hunt for the right button themselves.
       document.getElementById('settings-groq').value = window.aiManager.groqKeys.join('\n');
       document.getElementById('settings-gemini').value = window.aiManager.geminiKeys.join('\n');
       UI.showModal('modal-settings');
@@ -292,99 +317,99 @@ function wireStaticButtons() {
     }
     App.soloMode = true;
     App.myId = genUUID();
-    App.state.players = { [App.myId]: { id: App.myId, name: 'Speler', character: null } };
-    document.getElementById('lobby-room-code').textContent = 'Solo avontuur';
+    App.state.players = { [App.myId]: { id: App.myId, name: 'Player', character: null } };
+    document.getElementById('lobby-room-code').textContent = 'Solo adventure';
     document.getElementById('input-player-name').value = '';
     UI.renderLobbyPlayerList(App.state.players);
     UI.showScreen('screen-lobby');
   }));
 
-  // --- multiplayer keuze ---
+  // --- multiplayer choice ---
   document.getElementById('btn-multi').addEventListener('click', safeHandler(() => {
-    if (!window.aiManager.hasAnyKey()) { UI.toast('Stel eerst een AI-sleutel in (alleen de host heeft ze nodig).'); }
+    if (!window.aiManager.hasAnyKey()) { UI.toast('Set an AI key first (only the host needs one).'); }
     UI.showScreen('screen-multi-choice');
   }));
 
   document.getElementById('btn-create-room').addEventListener('click', safeHandler(async () => {
     const statusEl = document.getElementById('multi-status');
-    statusEl.textContent = 'Kamer aanmaken...';
+    statusEl.textContent = 'Creating room...';
     try {
-      const roomCode = await window.multiplayer.hostRoom('Speler');
+      const roomCode = await window.multiplayer.hostRoom('Player');
       App.soloMode = false;
       App.myId = window.multiplayer.myId;
-      App.state.players = { [App.myId]: { id: App.myId, name: 'Speler', character: null } };
-      document.getElementById('lobby-room-code').textContent = `Kamercode: ${roomCode} — deel deze met je vrienden`;
+      App.state.players = { [App.myId]: { id: App.myId, name: 'Player', character: null } };
+      document.getElementById('lobby-room-code').textContent = `Room code: ${roomCode} — share this with your friends`;
       document.getElementById('input-player-name').value = '';
       UI.renderLobbyPlayerList(App.state.players);
       UI.showScreen('screen-lobby');
     } catch (err) {
-      statusEl.textContent = 'Kon geen kamer aanmaken: ' + err.message;
+      statusEl.textContent = 'Could not create a room: ' + err.message;
     }
   }));
 
   document.getElementById('btn-join-room').addEventListener('click', safeHandler(async () => {
     const code = document.getElementById('input-room-code').value.trim();
     const statusEl = document.getElementById('multi-status');
-    if (!code) { statusEl.textContent = 'Vul een kamercode in.'; return; }
-    statusEl.textContent = 'Verbinden...';
+    if (!code) { statusEl.textContent = 'Enter a room code.'; return; }
+    statusEl.textContent = 'Connecting...';
     try {
-      await window.multiplayer.joinRoom(code, 'Speler');
+      await window.multiplayer.joinRoom(code, 'Player');
       App.soloMode = false;
       App.myId = window.multiplayer.myId;
-      App.state.players[App.myId] = { id: App.myId, name: 'Speler', character: null };
-      document.getElementById('lobby-room-code').textContent = `Kamercode: ${code}`;
+      App.state.players[App.myId] = { id: App.myId, name: 'Player', character: null };
+      document.getElementById('lobby-room-code').textContent = `Room code: ${code}`;
       document.getElementById('input-player-name').value = '';
       UI.renderLobbyPlayerList(App.state.players);
       UI.showScreen('screen-lobby');
     } catch (err) {
-      statusEl.textContent = 'Kon niet verbinden: ' + err.message;
+      statusEl.textContent = 'Could not connect: ' + err.message;
     }
   }));
 
-  // --- personage aanmaken ---
+  // --- create character ---
   document.getElementById('btn-create-char').addEventListener('click', safeHandler(async () => {
-    const name = document.getElementById('input-player-name').value.trim() || 'Speler';
+    const name = document.getElementById('input-player-name').value.trim() || 'Player';
     const desc = document.getElementById('input-char-desc').value.trim();
-    if (!desc) { UI.toast('Beschrijf eerst je personage.'); return; }
+    if (!desc) { UI.toast('Describe your character first.'); return; }
     if (!window.aiManager.hasAnyKey() && (App.soloMode || window.multiplayer.isHost)) {
-      UI.toast('Stel eerst een AI-sleutel in.'); return;
+      UI.toast('Set an AI key first.'); return;
     }
     const btn = document.getElementById('btn-create-char');
     btn.disabled = true;
-    btn.textContent = 'Personage wordt gesmeed...';
+    btn.textContent = 'Forging character...';
     try {
       App.myName = name;
       if (App.soloMode || window.multiplayer.isHost) {
-        // wij genereren zelf (host/solo hebben de AI-sleutels)
+        // we generate it ourselves (host/solo have the AI keys)
         const character = await DungeonMaster.generateCharacter(desc, name);
         updateAiIndicator();
         const payload = { playerId: App.myId, name, character };
         applyCharacterCreated(payload);
         if (!App.soloMode) window.multiplayer.broadcast('character_created', payload, App.myId);
       } else {
-        // niet-host peer: vraag de host om het personage te genereren
-        // (peers hebben in dit ontwerp geen eigen AI-sleutel nodig)
-        UI.toast('Verzoek verstuurd naar host...');
+        // non-host peer: ask the host to generate the character
+        // (peers don't need their own AI key in this design)
+        UI.toast('Request sent to host...');
         window.multiplayer.send('char_request', { playerId: App.myId, name, desc });
       }
     } catch (err) {
-      UI.toast('Fout bij personage genereren: ' + err.message);
+      UI.toast('Error generating character: ' + err.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Personage aanmaken';
+      btn.textContent = 'Create character';
     }
   }));
 
-  // --- start avontuur (alleen host/solo) ---
+  // --- start adventure (host/solo only) ---
   document.getElementById('btn-start-adventure').addEventListener('click', safeHandler(async () => {
     App.started = true;
     UI.showScreen('screen-game');
     document.getElementById('game-room-label').textContent = App.soloMode
-      ? 'Solo avontuur' : `Kamer: ${window.multiplayer.roomCode}`;
+      ? 'Solo adventure' : `Room: ${window.multiplayer.roomCode}`;
     UI.renderDiceButtons(rollDice);
     refreshLobbyOrGameUI();
     setActionInputEnabled(false);
-    addHistory({ type: 'system', text: 'De Dungeon Master verzamelt zijn gedachten...' });
+    addHistory({ type: 'system', text: 'The Dungeon Master gathers their thoughts...' });
     try {
       const result = await DungeonMaster.startAdventure(App.state.players);
       updateAiIndicator();
@@ -396,19 +421,19 @@ function wireStaticButtons() {
     }
   }));
 
-  // Niet-host peers wachten simpelweg tot ze een 'dm_response' + screen
-  // switch-signaal krijgen. We gebruiken 'dm_response' zelf als trigger.
+  // Non-host peers simply wait until they receive a 'dm_response' + screen
+  // switch signal. We use 'dm_response' itself as the trigger.
   window.multiplayer.on('dm_response', safeHandler(() => {
     if (!App.started) {
       App.started = true;
       UI.showScreen('screen-game');
       document.getElementById('game-room-label').textContent = App.soloMode
-        ? 'Solo avontuur' : `Kamer: ${window.multiplayer.roomCode}`;
+        ? 'Solo adventure' : `Room: ${window.multiplayer.roomCode}`;
       UI.renderDiceButtons(rollDice);
     }
   }));
 
-  // Host: verwerk personage-verzoeken van peers zonder eigen AI-sleutel
+  // Host: handle character requests from peers without their own AI key
   window.multiplayer.on('char_request', async (payload, fromId) => {
     if (!window.multiplayer.isHost) return;
     try {
@@ -422,28 +447,32 @@ function wireStaticButtons() {
     }
   });
 
-  // Peer: krijg een duidelijke melding als de host het personage niet kon genereren
+  // Peer: get a clear notification if the host couldn't generate the character
   window.multiplayer.on('char_error', safeHandler((payload) => {
     if (payload.playerId === App.myId) {
-      UI.toast('Fout bij personage genereren: ' + payload.message);
+      UI.toast('Error generating character: ' + payload.message);
     }
   }));
 
-  // --- actie versturen ---
+  // --- send action ---
   document.getElementById('btn-send-action').addEventListener('click', safeHandler(sendAction));
   document.getElementById('input-action').addEventListener('keydown', safeHandler((e) => {
     if (e.key === 'Enter') sendAction();
   }));
 
-  // --- inventaris-modal sluiten (was nergens gekoppeld) ---
+  // --- close inventory modal (wasn't wired up anywhere) ---
   document.getElementById('btn-inv-close').addEventListener('click', safeHandler(() => UI.hideModal('modal-inventory')));
 
   async function sendAction() {
     const input = document.getElementById('input-action');
     const text = input.value.trim();
     if (!text || App.busy) return;
-    input.value = '';
     const me = App.state.players[App.myId];
+    if (me?.character && CharacterFactory.isDead(me.character)) {
+      UI.toast('Your character has died and can no longer act.');
+      return;
+    }
+    input.value = '';
     addHistory({ type: 'action', player: me.name, text });
 
     if (App.soloMode) {
@@ -460,12 +489,12 @@ function wireStaticButtons() {
     }
   }
 
-  // --- dobbelstenen ---
+  // --- dice ---
   function rollDice(sides) {
     const modifier = parseInt(document.getElementById('dice-modifier').value, 10) || 0;
     const result = Dice.rollWithModifier(sides, modifier);
     const me = App.state.players[App.myId];
-    const label = result.label + (result.isCrit ? ' — KRITIEK!' : result.isFumble ? ' — FUMBLE!' : '');
+    const label = result.label + (result.isCrit ? ' — CRITICAL!' : result.isFumble ? ' — FUMBLE!' : '');
     dispatch('roll', { playerName: me.name, label }, applyRoll);
   }
 }

@@ -1,25 +1,26 @@
 /**
- * Character — hulpfuncties voor het DnD character sheet.
- * Een sheet is een plain object zodat het probleemloos over PeerJS
- * (JSON-serialiseerbaar) verstuurd kan worden.
+ * Character — helper functions for the D&D character sheet.
+ * A sheet is a plain object so it can be sent over PeerJS
+ * (JSON-serializable) without any trouble.
  */
 const CharacterFactory = {
   empty(name) {
     return {
-      name: name || 'Naamloos',
+      name: name || 'Unnamed',
       class: '???',
       race: '???',
       level: 1,
       background: '',
       stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
       hp: { current: 10, max: 10 },
+      status: 'alive', // 'alive' | 'dead'
       inventory: [],
       skills: [],
       spells: []
     };
   },
 
-  /** Valideert en normaliseert een (mogelijk onvolledig) AI-gegenereerd sheet. */
+  /** Validates and normalizes a (possibly incomplete) AI-generated sheet. */
   sanitize(raw, fallbackName) {
     const base = CharacterFactory.empty(fallbackName);
     if (!raw || typeof raw !== 'object') return base;
@@ -40,6 +41,7 @@ const CharacterFactory = {
       background: (raw.background || '').toString().slice(0, 300),
       stats,
       hp: { current: curHp, max: maxHp },
+      status: curHp <= 0 ? 'dead' : 'alive',
       inventory: Array.isArray(raw.inventory)
         ? raw.inventory.map(it => sanitizeItem(it)).filter(Boolean)
         : [],
@@ -111,10 +113,21 @@ const CharacterFactory = {
     return next;
   },
 
+  /**
+   * Applies HP damage (negative delta) or healing (positive delta).
+   * HP is clamped between 0 and max. When HP hits 0 the character's
+   * status flips to 'dead'; healing a dead character back above 0
+   * revives them (status flips back to 'alive').
+   */
   applyDamageOrHeal(sheet, delta) {
     const next = structuredClone(sheet);
     next.hp.current = clampInt(next.hp.current + delta, 0, next.hp.max, next.hp.current);
+    next.status = next.hp.current <= 0 ? 'dead' : 'alive';
     return next;
+  },
+
+  isDead(sheet) {
+    return !!sheet && (sheet.status === 'dead' || sheet.hp.current <= 0);
   }
 };
 

@@ -1,25 +1,24 @@
 /**
- * utils.js — kleine hulpfuncties die overal gedeeld worden.
+ * utils.js — small helper functions shared across the app.
  *
- * Belangrijk: crypto.randomUUID() bestaat alleen in "secure contexts"
- * (https, localhost, file://). Sommige testomgevingen (bv. de site
- * openen via een lokaal netwerk-IP over gewoon http, of bepaalde
- * embedded webviews/browsers) zijn dat NIET — dan ontbreekt
- * crypto.randomUUID gewoon, en gooit elke knop die het aanroept
- * (zoals "Solo spelen") een onopgevangen fout, waardoor er niets
- * zichtbaars gebeurt. Deze fallback zorgt dat er altijd een bruikbaar
- * uniek ID gegenereerd wordt, ongeacht de context.
+ * Important: crypto.randomUUID() only exists in "secure contexts"
+ * (https, localhost, file://). Some test environments (e.g. opening the
+ * site via a local network IP over plain http, or certain embedded
+ * webviews/browsers) are NOT — in that case crypto.randomUUID is simply
+ * missing, and any button that calls it (like "Play solo") throws an
+ * uncaught error, so nothing visible happens. This fallback ensures a
+ * usable unique ID is always generated, regardless of context.
  */
 function genUUID() {
   if (window.crypto && typeof window.crypto.randomUUID === 'function') {
     try {
       return window.crypto.randomUUID();
     } catch (e) {
-      // val terug op onderstaande fallback
+      // fall through to the fallback below
     }
   }
-  // RFC4122-achtige v4 fallback (geen crypto-sterke randomness nodig,
-  // dit ID wordt alleen lokaal gebruikt om spelers te onderscheiden)
+  // RFC4122-like v4 fallback (no cryptographically strong randomness
+  // needed, this ID is only used locally to tell players apart)
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -29,9 +28,9 @@ function genUUID() {
 window.genUUID = genUUID;
 
 /**
- * Wrapt een event-handler zodat een onverwachte fout niet stil de knop
- * "laat doodvallen", maar zichtbaar wordt via een toast + console.error.
- * Ondersteunt zowel synchrone als async handlers.
+ * Wraps an event handler so an unexpected error doesn't silently make
+ * the button "die", but instead surfaces via a toast + console.error.
+ * Supports both synchronous and async handlers.
  */
 function safeHandler(fn) {
   return function (...args) {
@@ -48,9 +47,9 @@ function safeHandler(fn) {
 }
 
 function reportHandlerError(err) {
-  console.error('[UI] Onverwachte fout:', err);
+  console.error('[UI] Unexpected error:', err);
   if (window.UI && typeof window.UI.toast === 'function') {
-    UI.toast('⚠ Er ging iets mis: ' + (err && err.message ? err.message : 'onbekende fout'));
+    UI.toast('⚠ Something went wrong: ' + (err && err.message ? err.message : 'unknown error'));
   }
 }
 
