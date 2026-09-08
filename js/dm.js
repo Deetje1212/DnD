@@ -44,6 +44,10 @@ Gebruik lege arrays voor loot/levelup als er niets te melden is, of laat het hel
       { role: 'user', content: `Spelernaam: ${playerName}\nBeschrijving: ${description}` }
     ]);
     const json = extractJson(text);
+    if (!json) {
+      console.warn('[DM] AI-antwoord voor personage kon niet als JSON gelezen worden:', text);
+      throw new Error('De AI gaf geen geldig personage terug. Probeer het opnieuw (evt. met een kortere beschrijving).');
+    }
     return CharacterFactory.sanitize(json, playerName);
   },
 
@@ -129,11 +133,20 @@ function extractJson(text) {
   const start = cleaned.indexOf('{');
   const end = cleaned.lastIndexOf('}');
   if (start === -1 || end === -1) return null;
+  const candidate = cleaned.slice(start, end + 1);
   try {
-    return JSON.parse(cleaned.slice(start, end + 1));
+    return JSON.parse(candidate);
   } catch (e) {
-    console.warn('[DM] kon character JSON niet parsen:', e, cleaned);
-    return null;
+    // Sommige modellen laten een trailing komma vallen vlak voor } of ],
+    // wat standaard JSON.parse laat falen — probeer dat eerst te herstellen
+    // voordat we opgeven.
+    try {
+      const repaired = candidate.replace(/,(\s*[}\]])/g, '$1');
+      return JSON.parse(repaired);
+    } catch (e2) {
+      console.warn('[DM] kon character JSON niet parsen:', e2, cleaned);
+      return null;
+    }
   }
 }
 

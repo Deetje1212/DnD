@@ -418,8 +418,16 @@ function wireStaticButtons() {
       window.multiplayer.broadcast('character_created', result, App.myId);
     } catch (err) {
       console.error(err);
+      window.multiplayer.broadcast('char_error', { playerId: payload.playerId, message: err.message }, App.myId);
     }
   });
+
+  // Peer: krijg een duidelijke melding als de host het personage niet kon genereren
+  window.multiplayer.on('char_error', safeHandler((payload) => {
+    if (payload.playerId === App.myId) {
+      UI.toast('Fout bij personage genereren: ' + payload.message);
+    }
+  }));
 
   // --- actie versturen ---
   document.getElementById('btn-send-action').addEventListener('click', safeHandler(sendAction));
